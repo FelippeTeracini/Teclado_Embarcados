@@ -41,7 +41,105 @@
 #define UART_COMM USART0
 #endif
 
+#define LED_PIO_ID	   ID_PIOC
+#define LED_PIO        PIOC
+#define LED_PIN		   8
+#define LED_PIN_MASK   (1<<LED_PIN)
+
+#define BUT1_PIO           PIOB
+#define BUT1_PIO_ID        11
+#define BUT1_PIO_IDX       3u
+#define BUT1_PIO_IDX_MASK (1u << BUT1_PIO_IDX)
+
+#define BUT2_PIO           PIOB
+#define BUT2_PIO_ID        11
+#define BUT2_PIO_IDX       2u
+#define BUT2_PIO_IDX_MASK (1u << BUT2_PIO_IDX)
+
+#define BUT3_PIO           PIOC
+#define BUT3_PIO_ID        12
+#define BUT3_PIO_IDX       30u
+#define BUT3_PIO_IDX_MASK (1u << BUT3_PIO_IDX)
+
+#define BUT_DEBOUNCING_VALUE  100
+
+#define MAX_SIZE 32
+
 volatile long g_systimer = 0;
+volatile char lista[MAX_SIZE][3];
+volatile int n = 0;
+volatile char eop = '-';
+
+void BUT_RISE(char button){
+	
+	lista[n][0] = button;
+	lista[n][1] = '0';
+	lista[n][2] = eop;
+	
+	n++;
+	
+}
+
+void BUT_FALL(char button){
+	
+	lista[n][0] = button;
+	lista[n][1] = '1';
+	lista[n][2] = eop;
+	
+	n++;
+	
+}
+
+void BUT1_Handler(){
+	if(pio_get(BUT1_PIO, PIO_INPUT, BUT1_PIO_IDX_MASK))
+		BUT_RISE('q');
+	else
+		BUT_FALL('q');
+}
+
+void BUT2_Handler(){
+	if(pio_get(BUT2_PIO, PIO_INPUT, BUT2_PIO_IDX_MASK))
+		BUT_RISE('w');
+	else
+		BUT_FALL('w');
+}
+
+void BUT3_Handler(){
+	if(pio_get(BUT3_PIO, PIO_INPUT, BUT3_PIO_IDX_MASK))
+		BUT_RISE('e');
+	else
+		BUT_FALL('e');
+}
+
+void BUT_init(){
+	pmc_enable_periph_clk(BUT1_PIO_ID);
+	pmc_enable_periph_clk(BUT2_PIO_ID);
+	pmc_enable_periph_clk(BUT3_PIO_ID);
+	
+	pio_set_input(BUT1_PIO,BUT1_PIO_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
+	pio_set_input(BUT2_PIO,BUT2_PIO_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
+	pio_set_input(BUT3_PIO,BUT3_PIO_IDX_MASK, PIO_PULLUP | PIO_DEBOUNCE);
+	
+	pio_pull_up(BUT1_PIO, BUT1_PIO_IDX_MASK, 1);
+	pio_pull_up(BUT2_PIO, BUT2_PIO_IDX_MASK, 1);
+	pio_pull_up(BUT3_PIO, BUT3_PIO_IDX_MASK, 1);
+	
+	pio_enable_interrupt(BUT1_PIO, BUT1_PIO_IDX_MASK);
+	pio_enable_interrupt(BUT2_PIO, BUT2_PIO_IDX_MASK);
+	pio_enable_interrupt(BUT3_PIO, BUT3_PIO_IDX_MASK);
+	
+	pio_handler_set(BUT1_PIO, BUT1_PIO_ID, BUT1_PIO_IDX_MASK, PIO_IT_EDGE, BUT1_Handler);
+	pio_handler_set(BUT2_PIO, BUT2_PIO_ID, BUT2_PIO_IDX_MASK, PIO_IT_EDGE, BUT2_Handler);
+	pio_handler_set(BUT3_PIO, BUT3_PIO_ID, BUT3_PIO_IDX_MASK, PIO_IT_EDGE, BUT3_Handler);
+	
+	NVIC_EnableIRQ(BUT1_PIO_ID);
+	NVIC_EnableIRQ(BUT2_PIO_ID);
+	NVIC_EnableIRQ(BUT3_PIO_ID);
+	
+	NVIC_SetPriority(BUT1_PIO_ID, 1);
+	NVIC_SetPriority(BUT2_PIO_ID, 1);
+	NVIC_SetPriority(BUT3_PIO_ID, 1);
+}
 
 void SysTick_Handler() {
 	g_systimer++;
@@ -110,11 +208,20 @@ int hc05_server_init(void) {
 	char buffer_rx[128];
 	usart_send_command(USART0, buffer_rx, 1000, "AT", 1000);
 	usart_send_command(USART0, buffer_rx, 1000, "AT", 1000);	
-	usart_send_command(USART0, buffer_rx, 1000, "AT+NAMEServer", 1000);
+	usart_send_command(USART0, buffer_rx, 1000, "AT+NAMEKeyboard", 1000);
 	usart_log("hc05_server_init", buffer_rx);
 	usart_send_command(USART0, buffer_rx, 1000, "AT", 1000);
-	usart_send_command(USART0, buffer_rx, 1000, "AT+PIN0000", 1000);
+	usart_send_command(USART0, buffer_rx, 1000, "AT+PIN1234", 1000);
 	usart_log("hc05_server_init", buffer_rx);
+}
+
+void sendBT(char lista[3]){
+	while(!usart_is_tx_ready(UART_COMM));
+	usart_write(UART_COMM, lista[0]);
+	while(!usart_is_tx_ready(UART_COMM));
+	usart_write(UART_COMM, lista[1]);
+	while(!usart_is_tx_ready(UART_COMM));
+	usart_write(UART_COMM, lista[2]);
 }
 
 
@@ -122,6 +229,7 @@ int main (void)
 {
 	board_init();
 	sysclk_init();
+	BUT_init();
 	delay_init();
 	SysTick_Config(sysclk_get_cpu_hz() / 1000); // 1 ms
 	config_console();
@@ -133,20 +241,20 @@ int main (void)
 	hc05_server_init();
 	#endif
 	
-	char button1 = '0';
-	char eof = 'X';
 	char buffer[1024];
 	
 	while(1) {
-		if(pio_get(PIOA, PIO_INPUT, PIO_PA11) == 0) {
-			button1 = '1';
-		} else {
-			button1 = '0';
+		pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);
+		while(n > 0){
+			
+			sendBT(lista[0]);
+			for(int i = 1; i < n; i++){
+				lista[i - 1][0] = lista[i][0];
+				lista[i - 1][1] = lista[i][1];
+				lista[i - 1][2] = lista[i][2];
+			}
+			n--;
+
 		}
-		
-		while(!usart_is_tx_ready(UART_COMM));
-		usart_write(UART_COMM, button1);
-		while(!usart_is_tx_ready(UART_COMM));
-		usart_write(UART_COMM, eof);
 	}
 }

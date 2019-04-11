@@ -6,7 +6,7 @@ import logging
 
 class MyControllerMap:
     def __init__(self):
-        self.button = {'A': 'L'} # Fast forward (10 seg) pro Youtube
+        self.button = {'q': 'q', 'w': 'w', 'e': 'e'} # Fast forward (10 seg) pro Youtube
 
 class SerialControllerInterface:
     # Protocolo
@@ -21,21 +21,48 @@ class SerialControllerInterface:
     
     def update(self):
         ## Sync protocol
-        while self.incoming != b'X':
+        while self.incoming != b'-':
             self.incoming = self.ser.read()
             logging.debug("Received INCOMING: {}".format(self.incoming))
 
-        data = self.ser.read()
-        logging.debug("Received DATA: {}".format(data))
+        button = self.ser.read()
+        print(button)
+        status = self.ser.read()
+        print(status)
+        #logging.debug("Received DATA: {}".format(data))
 
-        if data == b'1':
-            logging.info("KEYDOWN A")
-            pyautogui.keyDown(self.mapping.button['A'])
-        elif data == b'0':
-            logging.info("KEYUP A")
-            pyautogui.keyUp(self.mapping.button['A'])
+        if button == b'q':
+
+            if status == b'1':
+                logging.info("KEYDOWN q")
+                pyautogui.keyDown(self.mapping.button['q'])
+                
+            elif status == b'0':
+                logging.info("KEYUP q")
+                pyautogui.keyUp(self.mapping.button['q'])
+
+        if button == b'w':
+
+            if status == b'1':
+                logging.info("KEYDOWN w")
+                pyautogui.keyDown(self.mapping.button['w'])
+                
+            elif status == b'0':
+                logging.info("KEYUP w")
+                pyautogui.keyUp(self.mapping.button['w'])
+
+        if button == b'e':
+
+            if status == b'1':
+                logging.info("KEYDOWN e")
+                pyautogui.keyDown(self.mapping.button['e'])
+                
+            elif status == b'0':
+                logging.info("KEYUP e")
+                pyautogui.keyUp(self.mapping.button['e'])
 
         self.incoming = self.ser.read()
+        print(self.incoming)
 
 
 class DummyControllerInterface:

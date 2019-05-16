@@ -1,5 +1,6 @@
 from __future__ import print_function
 from pycaw.pycaw import AudioUtilities
+import struct
 import pyautogui
 import serial
 import argparse
@@ -87,7 +88,6 @@ class SerialControllerInterface:
     def update(self):
         # Sync protocol
         audio_controller = AudioController('chrome.exe')
-        audio_controller.set_volume(0.0)
 
         while self.incoming != b'-':
             self.incoming = self.ser.read()
@@ -130,7 +130,9 @@ class SerialControllerInterface:
                 pyautogui.keyUp(self.mapping.button['e'])
 
         if button == b'v':
-            volume = int(status) / 100
+            volume = int.from_bytes(status, byteorder='little')
+            volume = volume/100.0
+            print(volume)
             audio_controller.set_volume(volume)
 
         self.incoming = self.ser.read()
@@ -138,6 +140,7 @@ class SerialControllerInterface:
 
 
 class DummyControllerInterface:
+
     def __init__(self):
         self.mapping = MyControllerMap()
 

@@ -48,19 +48,34 @@
 #define LED_PIN		   8
 #define LED_PIN_MASK   (1<<LED_PIN)
 
-#define BUT1_PIO           PIOB
-#define BUT1_PIO_ID        11
-#define BUT1_PIO_IDX       3u
+#define LED1_PIO           PIOB
+#define LED1_PIO_ID        11
+#define LED1_PIO_IDX       4u
+#define LED1_PIO_IDX_MASK  (1u << LED1_PIO_IDX)
+
+#define LED2_PIO           PIOA
+#define LED2_PIO_ID        10
+#define LED2_PIO_IDX       6u
+#define LED2_PIO_IDX_MASK  (1u << LED2_PIO_IDX)
+
+#define LED3_PIO           PIOA
+#define LED3_PIO_ID        10
+#define LED3_PIO_IDX       21u
+#define LED3_PIO_IDX_MASK  (1u << LED3_PIO_IDX)
+
+#define BUT1_PIO           PIOA
+#define BUT1_PIO_ID        10
+#define BUT1_PIO_IDX       2u
 #define BUT1_PIO_IDX_MASK (1u << BUT1_PIO_IDX)
 
-#define BUT2_PIO           PIOB
-#define BUT2_PIO_ID        11
-#define BUT2_PIO_IDX       2u
+#define BUT2_PIO           PIOA
+#define BUT2_PIO_ID        10
+#define BUT2_PIO_IDX       3u
 #define BUT2_PIO_IDX_MASK (1u << BUT2_PIO_IDX)
 
-#define BUT3_PIO           PIOC
-#define BUT3_PIO_ID        12
-#define BUT3_PIO_IDX       30u
+#define BUT3_PIO           PIOA
+#define BUT3_PIO_ID        10
+#define BUT3_PIO_IDX       4u
 #define BUT3_PIO_IDX_MASK (1u << BUT3_PIO_IDX)
 
 #define BUT_DEBOUNCING_VALUE  100
@@ -111,24 +126,36 @@ void BUT_FALL(char button){
 }
 
 void BUT1_Handler(){
-	if(pio_get(BUT1_PIO, PIO_INPUT, BUT1_PIO_IDX_MASK))
+	if(pio_get(BUT1_PIO, PIO_INPUT, BUT1_PIO_IDX_MASK)){
 		BUT_RISE('q');
-	else
+		pio_clear(LED1_PIO, LED1_PIO_IDX_MASK);
+	}
+	else{
 		BUT_FALL('q');
+		pio_set(LED1_PIO, LED1_PIO_IDX_MASK);
+	}
 }
 
 void BUT2_Handler(){
-	if(pio_get(BUT2_PIO, PIO_INPUT, BUT2_PIO_IDX_MASK))
+	if(pio_get(BUT2_PIO, PIO_INPUT, BUT2_PIO_IDX_MASK)){
 		BUT_RISE('w');
-	else
+		pio_clear(LED2_PIO, LED2_PIO_IDX_MASK);
+	}
+	else{
 		BUT_FALL('w');
+		pio_set(LED2_PIO, LED2_PIO_IDX_MASK);
+	}
 }
 
 void BUT3_Handler(){
-	if(pio_get(BUT3_PIO, PIO_INPUT, BUT3_PIO_IDX_MASK))
+	if(pio_get(BUT3_PIO, PIO_INPUT, BUT3_PIO_IDX_MASK)){
 		BUT_RISE('e');
-	else
+		pio_clear(LED3_PIO, LED3_PIO_IDX_MASK);
+	}
+	else{
 		BUT_FALL('e');
+		pio_set(LED3_PIO, LED3_PIO_IDX_MASK);
+	}
 }
 
 void BUT_init(){
@@ -159,6 +186,20 @@ void BUT_init(){
 	NVIC_SetPriority(BUT1_PIO_ID, 1);
 	NVIC_SetPriority(BUT2_PIO_ID, 1);
 	NVIC_SetPriority(BUT3_PIO_ID, 1);
+}
+
+void LED_init(){
+	pmc_enable_periph_clk(LED1_PIO_ID);
+	pmc_enable_periph_clk(LED2_PIO_ID);
+	pmc_enable_periph_clk(LED3_PIO_ID);
+	
+	pio_set_output(LED1_PIO, LED1_PIO_IDX_MASK, 0, 0, 0);
+	pio_set_output(LED2_PIO, LED2_PIO_IDX_MASK, 0, 0, 0);
+	pio_set_output(LED3_PIO, LED3_PIO_IDX_MASK, 0, 0, 0);
+	
+	pio_clear(LED1_PIO, LED1_PIO_IDX_MASK);
+	pio_clear(LED2_PIO, LED2_PIO_IDX_MASK);
+	pio_clear(LED3_PIO, LED3_PIO_IDX_MASK);
 }
 
 void SysTick_Handler() {
@@ -435,6 +476,7 @@ int main (void)
 	board_init();
 	sysclk_init();
 	BUT_init();
+	LED_init();
 	delay_init();
 	SysTick_Config(sysclk_get_cpu_hz() / 1000); // 1 ms
 	config_console();
@@ -463,6 +505,7 @@ int main (void)
 		pmc_sleep(SAM_PM_SMODE_SLEEP_WFI);
 		while(n > 0){
 			
+			printf("Botao: %c\n", lista[0][0]);
 			sendBT(lista[0]);
 			for(int i = 1; i < n; i++){
 				lista[i - 1][0] = lista[i][0];
@@ -478,11 +521,11 @@ int main (void)
 			int volume = convert_adc_to_volume(g_res_value);
 			if(volume != prev_volume){
 				printf("Volume: %d\n", volume);
-				char volume_char = volume;
+				char volume_char = (char) volume;
 				lista[n][0] = 'v';
 				lista[n][1] = volume_char;
 				lista[n][2] = eop;
-				n++;	
+				n++;
 			}
 			prev_volume = volume;
 			g_is_conversion_done = false;
